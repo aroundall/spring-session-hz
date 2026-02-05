@@ -134,6 +134,7 @@ public class HazelcastSession implements Session {
     }
 
     @Override
+    @JsonIgnore
     public Set<String> getAttributeNames() {
         return this.attributes.keySet();
     }
@@ -159,6 +160,7 @@ public class HazelcastSession implements Session {
     }
 
     @Override
+    @JsonIgnore
     public Instant getCreationTime() {
         return Instant.ofEpochMilli(this.creationTime);
     }
@@ -178,6 +180,7 @@ public class HazelcastSession implements Session {
     }
 
     @Override
+    @JsonIgnore
     public Instant getLastAccessedTime() {
         return Instant.ofEpochMilli(this.lastAccessedTime);
     }
@@ -197,6 +200,7 @@ public class HazelcastSession implements Session {
     }
 
     @Override
+    @JsonIgnore
     public Duration getMaxInactiveInterval() {
         return Duration.ofSeconds(this.maxInactiveIntervalSeconds);
     }
@@ -210,6 +214,7 @@ public class HazelcastSession implements Session {
     }
 
     @Override
+    @JsonIgnore
     public boolean isExpired() {
         if (this.maxInactiveIntervalSeconds < 0) {
             return false;
