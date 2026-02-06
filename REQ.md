@@ -8,7 +8,7 @@ Build a Spring Boot Starter library for distributed HTTP session management, usi
 
 - Spring Boot 3.x
 - Hazelcast, Client mode
-- Jackson JSON serialization, with `@class` type information to preserve attribute value types
+- Use `spring-session-hazelcast` for session storage (serialization is Hazelcast-native by default, and can be swapped via Hazelcast serialization configuration if needed)
 - Maven build, packaged as a JAR dependency
 
 ## 3. Session Management

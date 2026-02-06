@@ -24,10 +24,7 @@ import static org.hamcrest.Matchers.*;
  */
 @SpringBootTest(
         classes = TestApplication.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "hazelcast.test.port=5799"  // Use non-default port to avoid conflicts
-        }
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
 )
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class SessionIntegrationTest {

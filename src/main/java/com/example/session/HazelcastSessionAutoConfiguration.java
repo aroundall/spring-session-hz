@@ -2,7 +2,6 @@ package com.example.session;
 
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.client.config.ClientConfig;
-import com.hazelcast.config.SerializerConfig;
 import com.hazelcast.core.HazelcastInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,14 +9,19 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.session.SaveMode;
 import org.springframework.session.Session;
 import org.springframework.session.SessionRepository;
 import org.springframework.session.config.annotation.web.http.EnableSpringHttpSession;
+import org.springframework.session.hazelcast.HazelcastIndexedSessionRepository;
+import org.springframework.session.hazelcast.config.annotation.SpringSessionHazelcastInstance;
 import org.springframework.session.web.http.CookieSerializer;
 import org.springframework.session.web.http.DefaultCookieSerializer;
 import org.springframework.session.web.http.SessionRepositoryFilter;
+
+import java.time.Duration;
 
 /**
  * Auto-configuration for Hazelcast-based HTTP session management.
@@ -37,8 +41,13 @@ import org.springframework.session.web.http.SessionRepositoryFilter;
  * </ul>
  */
 @AutoConfiguration
-@ConditionalOnWebApplication
-@ConditionalOnClass({HazelcastInstance.class, Session.class, SessionRepositoryFilter.class})
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+@ConditionalOnClass({
+        HazelcastInstance.class,
+        HazelcastIndexedSessionRepository.class,
+        Session.class,
+        SessionRepositoryFilter.class
+})
 @EnableSpringHttpSession
 public class HazelcastSessionAutoConfiguration {
 
@@ -60,6 +69,11 @@ public class HazelcastSessionAutoConfiguration {
     public static final String DEFAULT_HZ_URL = "localhost:5701";
 
     /**
+     * Default session timeout: 30 minutes.
+     */
+    public static final Duration DEFAULT_SESSION_TIMEOUT = Duration.ofMinutes(30);
+
+    /**
      * Creates and configures the CookieSerializer with custom session cookie name.
      *
      * @return the cookie serializer
@@ -77,25 +91,14 @@ public class HazelcastSessionAutoConfiguration {
     }
 
     /**
-     * Creates the SessionSerializer for Hazelcast.
-     *
-     * @return the session serializer
-     */
-    @Bean
-    @ConditionalOnMissingBean(SessionSerializer.class)
-    public SessionSerializer sessionSerializer() {
-        return new SessionSerializer();
-    }
-
-    /**
      * Creates a Hazelcast client instance configured from environment variables.
      *
-     * @param sessionSerializer the session serializer
      * @return the Hazelcast instance
      */
     @Bean(destroyMethod = "shutdown")
-    @ConditionalOnMissingBean(HazelcastInstance.class)
-    public HazelcastInstance hazelcastInstance(SessionSerializer sessionSerializer) {
+    @SpringSessionHazelcastInstance
+    @ConditionalOnMissingBean(annotation = SpringSessionHazelcastInstance.class)
+    public HazelcastInstance hazelcastInstance() {
         String hzUrl = getEnvOrDefault("HZ_URL", DEFAULT_HZ_URL);
         String hzUsername = System.getenv("HZ_USERNAME");
         String hzPassword = System.getenv("HZ_PASSWORD");
@@ -113,12 +116,6 @@ public class HazelcastSessionAutoConfiguration {
             logger.info("Hazelcast authentication configured for user: {}", hzUsername);
         }
 
-        // Register custom serializer for HazelcastSession
-        SerializerConfig serializerConfig = new SerializerConfig()
-                .setImplementation(sessionSerializer)
-                .setTypeClass(HazelcastSession.class);
-        clientConfig.getSerializationConfig().addSerializerConfig(serializerConfig);
-
         logger.info("Creating Hazelcast client connecting to: {}", hzUrl);
         return HazelcastClient.newHazelcastClient(clientConfig);
     }
@@ -131,21 +128,16 @@ public class HazelcastSessionAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(SessionRepository.class)
-    public HazelcastSessionRepository sessionRepository(HazelcastInstance hazelcastInstance) {
-        return new HazelcastSessionRepository(hazelcastInstance);
-    }
-
-    /**
-     * Creates the session event listener.
-     *
-     * @param sessionRepository the session repository
-     * @param eventPublisher    the application event publisher
-     * @return the session event listener
-     */
-    @Bean
-    public SessionEventListener sessionEventListener(HazelcastSessionRepository sessionRepository,
-                                                      ApplicationEventPublisher eventPublisher) {
-        return new SessionEventListener(sessionRepository, eventPublisher);
+    public HazelcastIndexedSessionRepository sessionRepository(
+            @SpringSessionHazelcastInstance HazelcastInstance hazelcastInstance,
+            ApplicationEventPublisher eventPublisher) {
+        HazelcastIndexedSessionRepository repository = new HazelcastIndexedSessionRepository(hazelcastInstance);
+        repository.setApplicationEventPublisher(eventPublisher);
+        repository.setDefaultMaxInactiveInterval(DEFAULT_SESSION_TIMEOUT);
+        repository.setSaveMode(SaveMode.ALWAYS);
+        logger.info("Configured HazelcastIndexedSessionRepository with timeout: {} and saveMode: {}",
+                DEFAULT_SESSION_TIMEOUT, SaveMode.ALWAYS);
+        return repository;
     }
 
     private static String getEnvOrDefault(String name, String defaultValue) {
