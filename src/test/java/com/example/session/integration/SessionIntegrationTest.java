@@ -235,4 +235,44 @@ class SessionIntegrationTest {
 
         System.out.println("Multiple concurrent sessions work correctly");
     }
+
+    @Test
+    @Order(7)
+    void shouldPersistNestedCollectionMutationWithoutSetAttribute() {
+        // Login
+        Response loginResponse = given()
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                            "username": "history_user",
+                            "password": "pass"
+                        }
+                        """)
+        .when()
+                .post("/logon")
+        .then()
+                .statusCode(200)
+                .extract()
+                .response();
+
+        String sessionCookie = loginResponse.getCookie("USESSIONID");
+
+        // First /do-trans call should initialize + append to history
+        given()
+                .cookie("USESSIONID", sessionCookie)
+        .when()
+                .get("/do-trans")
+        .then()
+                .statusCode(200)
+                .body("historySize", equalTo(1));
+
+        // Second /do-trans call should append again without session.setAttribute
+        given()
+                .cookie("USESSIONID", sessionCookie)
+        .when()
+                .get("/do-trans")
+        .then()
+                .statusCode(200)
+                .body("historySize", equalTo(2));
+    }
 }

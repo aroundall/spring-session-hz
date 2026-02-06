@@ -6,7 +6,7 @@ This project is built on **Spring Session’s official Hazelcast module** (`spri
 - Enables Spring Session HTTP sessions automatically
 - Sets cookie name to `USESSIONID`
 - Forces a fixed 30-minute session timeout
-- Configures `SaveMode.ALWAYS` so collection mutations are persisted without requiring an extra `setAttribute`
+- Uses `SaveMode.ON_SET_ATTRIBUTE` + a change-tracking wrapper so in-place collection mutations are persisted without requiring an extra `setAttribute`
 
 ## Project Structure
 
@@ -14,7 +14,14 @@ This project is built on **Spring Session’s official Hazelcast module** (`spri
 spring-session-hz/
 ├── pom.xml
 ├── src/main/java/com/example/session/
-│   └── HazelcastSessionAutoConfiguration.java
+│   ├── HazelcastSessionAutoConfiguration.java
+│   ├── ChangeTrackingSession.java
+│   ├── ChangeTrackingSessionRepository.java
+│   └── proxy/
+│       ├── ChangeTrackingProxy.java
+│       ├── TrackedList.java
+│       ├── TrackedMap.java
+│       └── TrackedSet.java
 ├── src/main/resources/META-INF/spring/
 │   └── org.springframework.boot.autoconfigure.AutoConfiguration.imports
 └── src/test/java/com/example/session/integration/
@@ -56,10 +63,21 @@ Beans:
 - `HazelcastInstance` (client): built from `HZ_URL` / `HZ_USERNAME` / `HZ_PASSWORD`
   - Annotated with `@SpringSessionHazelcastInstance` so it won’t conflict with other Hazelcast usage
   - Created only if no existing `@SpringSessionHazelcastInstance` is provided
-- `HazelcastIndexedSessionRepository`:
+- `HazelcastIndexedSessionRepository` (delegate) + `ChangeTrackingSessionRepository` (wrapper):
   - Injects Spring `ApplicationEventPublisher` so Spring Session events are published
   - Sets default timeout to **30 minutes**
-  - Sets `SaveMode.ALWAYS`
+  - Sets `SaveMode.ON_SET_ATTRIBUTE`
+
+#### Why `SaveMode.ON_SET_ATTRIBUTE` + tracking?
+
+Spring Session’s Hazelcast repository only persists attribute changes when it considers the session “changed”.
+With `SaveMode.ON_SET_ATTRIBUTE`, in-place mutations like `((List) session.getAttribute("x")).add(...)` would
+not be detected unless the app calls `session.setAttribute("x", ...)` again.
+
+To satisfy the “collection mutation auto-save” requirement while avoiding the extra write amplification and
+concurrency overwrite risks of `SaveMode.ALWAYS`, this starter wraps collection attributes (`List`/`Map`/`Set`)
+via `ChangeTrackingSession#getAttribute(...)`. Any mutation triggers a `setAttribute(...)` on the underlying
+Spring Session `Session`, so Spring Session records a delta and persists it on request commit.
 
 ### 2. spring-session-hazelcast repository + events
 
@@ -96,4 +114,3 @@ The test setup uses a **random port** and a **random cluster name** per run to a
 4. Access with invalid session id returns 401
 5. Session persists across multiple requests
 6. Multiple sessions are isolated
-

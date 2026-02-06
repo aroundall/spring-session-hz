@@ -11,6 +11,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.SaveMode;
 import org.springframework.session.Session;
 import org.springframework.session.SessionRepository;
@@ -128,16 +129,26 @@ public class HazelcastSessionAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(SessionRepository.class)
-    public HazelcastIndexedSessionRepository sessionRepository(
+    public FindByIndexNameSessionRepository<Session> sessionRepository(
             @SpringSessionHazelcastInstance HazelcastInstance hazelcastInstance,
             ApplicationEventPublisher eventPublisher) {
-        HazelcastIndexedSessionRepository repository = new HazelcastIndexedSessionRepository(hazelcastInstance);
-        repository.setApplicationEventPublisher(eventPublisher);
-        repository.setDefaultMaxInactiveInterval(DEFAULT_SESSION_TIMEOUT);
-        repository.setSaveMode(SaveMode.ALWAYS);
-        logger.info("Configured HazelcastIndexedSessionRepository with timeout: {} and saveMode: {}",
-                DEFAULT_SESSION_TIMEOUT, SaveMode.ALWAYS);
-        return repository;
+        HazelcastIndexedSessionRepository delegate = new HazelcastIndexedSessionRepository(hazelcastInstance);
+        delegate.setApplicationEventPublisher(eventPublisher);
+        delegate.setDefaultMaxInactiveInterval(DEFAULT_SESSION_TIMEOUT);
+        delegate.setSaveMode(SaveMode.ON_SET_ATTRIBUTE);
+
+        try {
+            delegate.afterPropertiesSet();
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to initialize HazelcastIndexedSessionRepository", e);
+        }
+
+        logger.info("Configured HazelcastIndexedSessionRepository with timeout: {} and saveMode: {} (collection tracking enabled)",
+                DEFAULT_SESSION_TIMEOUT, SaveMode.ON_SET_ATTRIBUTE);
+
+        @SuppressWarnings("unchecked")
+        FindByIndexNameSessionRepository<Session> repository = (FindByIndexNameSessionRepository<Session>) (FindByIndexNameSessionRepository<?>) delegate;
+        return new ChangeTrackingSessionRepository(repository, delegate);
     }
 
     private static String getEnvOrDefault(String name, String defaultValue) {
