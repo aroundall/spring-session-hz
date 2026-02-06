@@ -60,7 +60,7 @@ Activated when:
 Beans:
 
 - `CookieSerializer`: sets cookie name to `USESSIONID`
-- `HazelcastInstance` (client): built from `HZ_URL` / `HZ_USERNAME` / `HZ_PASSWORD`
+- `HazelcastInstance` (client): built from `HZ_URL` / `HZ_CLUSTER_NAME` / `HZ_USERNAME` / `HZ_PASSWORD`
   - Annotated with `@SpringSessionHazelcastInstance` so it won’t conflict with other Hazelcast usage
   - Created only if no existing `@SpringSessionHazelcastInstance` is provided
 - `HazelcastIndexedSessionRepository` (delegate) + `ChangeTrackingSessionRepository` (wrapper):

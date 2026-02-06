@@ -34,13 +34,14 @@ import java.time.Duration;
  *   <li>The application is a web application</li>
  * </ul>
  *
- * <p>Configuration via environment variables:
- * <ul>
- *   <li>{@code HZ_URL} - Hazelcast server address (e.g., "localhost:5701")</li>
- *   <li>{@code HZ_USERNAME} - Hazelcast username for authentication</li>
- *   <li>{@code HZ_PASSWORD} - Hazelcast password for authentication</li>
- * </ul>
- */
+     * <p>Configuration via environment variables:
+     * <ul>
+     *   <li>{@code HZ_URL} - Hazelcast server address (e.g., "localhost:5701")</li>
+     *   <li>{@code HZ_CLUSTER_NAME} - Hazelcast cluster name (default: "dev")</li>
+     *   <li>{@code HZ_USERNAME} - Hazelcast username for authentication</li>
+     *   <li>{@code HZ_PASSWORD} - Hazelcast password for authentication</li>
+     * </ul>
+     */
 @AutoConfiguration
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @ConditionalOnClass({
@@ -86,7 +87,7 @@ public class HazelcastSessionAutoConfiguration {
         serializer.setCookieName(SESSION_COOKIE_NAME);
         serializer.setCookiePath("/");
         serializer.setUseHttpOnlyCookie(true);
-        serializer.setUseSecureCookie(false); // Set to true in production with HTTPS
+        // DefaultCookieSerializer defaults to HttpServletRequest#isSecure() when unset.
         logger.info("Configured session cookie name: {}", SESSION_COOKIE_NAME);
         return serializer;
     }
@@ -101,11 +102,12 @@ public class HazelcastSessionAutoConfiguration {
     @ConditionalOnMissingBean(annotation = SpringSessionHazelcastInstance.class)
     public HazelcastInstance hazelcastInstance() {
         String hzUrl = getEnvOrDefault("HZ_URL", DEFAULT_HZ_URL);
+        String clusterName = getEnvOrDefault("HZ_CLUSTER_NAME", DEFAULT_CLUSTER_NAME);
         String hzUsername = System.getenv("HZ_USERNAME");
         String hzPassword = System.getenv("HZ_PASSWORD");
 
         ClientConfig clientConfig = new ClientConfig();
-        clientConfig.setClusterName(DEFAULT_CLUSTER_NAME);
+        clientConfig.setClusterName(clusterName);
 
         // Configure network
         clientConfig.getNetworkConfig().addAddress(hzUrl);
@@ -117,7 +119,7 @@ public class HazelcastSessionAutoConfiguration {
             logger.info("Hazelcast authentication configured for user: {}", hzUsername);
         }
 
-        logger.info("Creating Hazelcast client connecting to: {}", hzUrl);
+        logger.info("Creating Hazelcast client connecting to: {} (clusterName: {})", hzUrl, clusterName);
         return HazelcastClient.newHazelcastClient(clientConfig);
     }
 

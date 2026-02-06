@@ -22,6 +22,7 @@ Build a Spring Boot Starter library for distributed HTTP session management, usi
 
 - Connect to Hazelcast via environment variables:
   - `HZ_URL` - server address (default: `localhost:5701`)
+  - `HZ_CLUSTER_NAME` - cluster name (default: `dev`)
   - `HZ_USERNAME` - username (optional)
   - `HZ_PASSWORD` - password (optional)
 

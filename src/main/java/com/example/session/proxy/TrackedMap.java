@@ -97,8 +97,9 @@ public class TrackedMap<K, V> implements Map<K, V> {
 
     @Override
     public V remove(Object key) {
+        boolean existed = delegate.containsKey(key);
         V removed = delegate.remove(key);
-        if (removed != null) {
+        if (existed) {
             markChanged();
         }
         return removed;
@@ -183,8 +184,7 @@ public class TrackedMap<K, V> implements Map<K, V> {
 
     @Override
     public V replace(K key, V value) {
-        V existing = delegate.get(key);
-        if (existing != null) {
+        if (delegate.containsKey(key)) {
             markChanged();
             return delegate.replace(key, unwrapValue(value));
         }
@@ -527,4 +527,3 @@ public class TrackedMap<K, V> implements Map<K, V> {
         }
     }
 }
-
